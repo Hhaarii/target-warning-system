@@ -1,0 +1,5 @@
+# Dependencies for ROS Person Re-ID System
+opencv-python>=4.5.0
+numpy>=1.20.0
+flask>=2.0.0
+requests>=2.25.0

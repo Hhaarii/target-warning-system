@@ -1,0 +1,7 @@
+# Data and local runtime files
+data/identities.json
+data/profiles/*.jpg
+gallery.pkl
+__pycache__/
+*.pyc
+.DS_Store
