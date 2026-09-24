@@ -5,3 +5,9 @@ gallery.pkl
 __pycache__/
 *.pyc
 .DS_Store
+.offgit/
+logs/
+*.log
+.env
+.env.*
+*.env
