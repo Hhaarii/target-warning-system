@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ROS 2 Person Detection & Biometric Re-Identification</title>
+    <title>Warning System for Target Identification</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,20 +18,20 @@
         <header class="navbar">
             <div class="brand">
                 <div class="brand-icon">
-                    <i class="fa-solid fa-user-gear"></i>
+                    <i class="fa-solid fa-triangle-exclamation"></i>
                 </div>
                 <div>
-                    <h1>ROS Person Re-ID Hub</h1>
-                    <p class="subtitle">Biometric Feature Embedding & Identification System</p>
+                    <h1>Warning System for Target Identification</h1>
+                    <p class="subtitle">Biometric Target Identification & Phone Warning Alert System</p>
                 </div>
             </div>
 
             <div class="header-status">
                 <div class="status-pill status-active">
-                    <span class="pulse-dot"></span> ROS 2 / ROS Node Active
+                    <span class="pulse-dot"></span> Phone Warning Pings Active
                 </div>
                 <button class="btn btn-danger-outline" onclick="clearDatabase()">
-                    <i class="fa-solid fa-trash-can"></i> Reset Identities
+                    <i class="fa-solid fa-trash-can"></i> Reset Targets
                 </button>
             </div>
         </header>
@@ -41,27 +41,27 @@
             <!-- Left Column: Video Feed & Live Perception -->
             <section class="card video-card">
                 <div class="card-header">
-                    <h2><i class="fa-solid fa-camera"></i> Live Camera Feed</h2>
-                    <span class="badge badge-primary"><i class="fa-solid fa-video"></i> /dev/video0</span>
+                    <h2><i class="fa-solid fa-camera"></i> Live Target Surveillance Feed</h2>
+                    <span class="badge badge-primary"><i class="fa-solid fa-mobile-screen"></i> KDEConnect Active</span>
                 </div>
                 <div class="video-container">
-                    <img id="videoFeed" src="/video_feed" alt="ROS Camera Stream Loading..." onerror="this.src=''; this.alt='Stream Paused';" />
+                    <img id="videoFeed" src="/video_feed" alt="Target Warning Feed Loading..." onerror="this.src=''; this.alt='Stream Paused';" />
                     <div class="hud-overlay">
-                        <span class="hud-tag"><i class="fa-solid fa-microchip"></i> Cosine Embedding Match</span>
+                        <span class="hud-tag"><i class="fa-solid fa-bell"></i> Target Alert System</span>
                     </div>
                 </div>
                 <div class="card-footer video-controls">
                     <div class="stat-box">
-                        <span class="stat-label">Identities Enrolled</span>
+                        <span class="stat-label">Enrolled Targets</span>
                         <span class="stat-value" id="statProfilesCount">0</span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Match Engine</span>
-                        <span class="stat-value text-accent">128-D Cosine</span>
+                        <span class="stat-label">Target Engine</span>
+                        <span class="stat-value text-accent">InsightFace + Cosine</span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">ROS Topic</span>
-                        <span class="stat-value text-mono">/person_id/...</span>
+                        <span class="stat-label">Phone Ping</span>
+                        <span class="stat-value text-mono">KDEConnect Ping</span>
                     </div>
                 </div>
             </section>
@@ -69,7 +69,7 @@
             <!-- Right Column: Identity Gallery & Live Feed -->
             <section class="card gallery-card">
                 <div class="card-header">
-                    <h2><i class="fa-solid fa-users"></i> Enrolled Identity Gallery</h2>
+                    <h2><i class="fa-solid fa-users-viewfinder"></i> Registered Target Gallery</h2>
                     <button class="btn btn-sm btn-secondary" onclick="loadProfiles()">
                         <i class="fa-solid fa-rotate-right"></i> Refresh
                     </button>
@@ -77,21 +77,21 @@
                 
                 <div class="gallery-scroll" id="profilesGallery">
                     <div class="empty-state">
-                        <i class="fa-solid fa-user-clock"></i>
-                        <p>No identities detected yet. Step in front of the laptop camera to enroll!</p>
+                        <i class="fa-solid fa-user-shield"></i>
+                        <p>No target identities detected yet. System is monitoring camera feed...</p>
                     </div>
                 </div>
 
                 <!-- Activity Log Footer -->
                 <div class="card-header border-top">
-                    <h2><i class="fa-solid fa-bell"></i> Live Activity Log</h2>
+                    <h2><i class="fa-solid fa-shield-cat"></i> Real-Time Warning Log</h2>
                 </div>
                 <div class="events-log" id="eventsLog">
                     <div class="event-item">
                         <i class="fa-solid fa-info-circle text-info"></i>
                         <div>
-                            <strong>System Ready</strong>
-                            <p>Camera monitoring pipeline initialized.</p>
+                            <strong>Warning System Ready</strong>
+                            <p>Target identification & phone notification daemon online.</p>
                         </div>
                     </div>
                 </div>
@@ -103,14 +103,14 @@
     <div class="modal-backdrop" id="editModal">
         <div class="modal-card">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-pen-to-square"></i> Rename Identity</h3>
+                <h3><i class="fa-solid fa-pen-to-square"></i> Rename Target Profile</h3>
                 <button class="btn-close" onclick="closeModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <p>Assign a custom display name (e.g. John Doe, Alice) to ID: <strong id="modalPersonId">person_001</strong></p>
+                <p>Assign a custom display name (e.g. Target Alpha, John) to ID: <strong id="modalPersonId">person_001</strong></p>
                 <div class="form-group">
                     <label for="modalInputName">Display Name</label>
-                    <input type="text" id="modalInputName" class="form-control" placeholder="Enter person name..." autofocus>
+                    <input type="text" id="modalInputName" class="form-control" placeholder="Enter target name..." autofocus>
                 </div>
             </div>
             <div class="modal-footer">

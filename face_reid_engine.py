@@ -1,6 +1,9 @@
 import os
 import cv2
 import numpy as np
+import subprocess
+import threading
+import time
 import config
 from identity_db import IdentityDatabase
 
@@ -13,10 +16,27 @@ except ImportError:
     INSIGHTFACE_AVAILABLE = False
 
 
+def send_phone_alert(target_id, visits):
+    """Sends a ping warning message to phone using kdeconnect-cli."""
+    def _worker():
+        message = f"WARNING: {target_id} has appeared {visits} times on camera!"
+        cmd = ["kdeconnect-cli", "--ping-msg", message]
+        if config.KDECONNECT_DEVICE_ID:
+            cmd += ["-d", config.KDECONNECT_DEVICE_ID]
+        try:
+            print(f"[PHONE ALERT] Dispatching warning ping to device {config.KDECONNECT_DEVICE_ID}...")
+            subprocess.run(cmd, check=True, timeout=5)
+        except Exception as e:
+            print(f"[WARN] Failed to dispatch phone alert via kdeconnect-cli: {e}")
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
 class FaceReIDEngine:
     def __init__(self, db: IdentityDatabase = None):
         self.db = db if db else IdentityDatabase()
         self.use_insightface = False
+        self.alerted_visits = {}  # Tracks if phone alert was sent for a target visit
         
         # Try initializing InsightFace model (from reid.py)
         if INSIGHTFACE_AVAILABLE:
@@ -83,11 +103,12 @@ class FaceReIDEngine:
 
     def process_frame(self, frame):
         """
-        Perception Pipeline:
+        Perception & Warning Pipeline:
         1. Detect faces & extract normalized feature embeddings
         2. Query database for matching identity via Cosine Distance
         3. Auto-enroll NEW persons or update EXISTING sightings
-        4. Render HUD annotations
+        4. Trigger KDEConnect phone warning alert if visit count > threshold
+        5. Render HUD annotations
         """
         if frame is None:
             return None, []
@@ -97,7 +118,6 @@ class FaceReIDEngine:
         detection_records = []
 
         if self.use_insightface:
-            # --- InsightFace Pipeline (from user's reid.py) ---
             try:
                 faces = self.app.get(frame)
                 for f in faces:
@@ -112,13 +132,13 @@ class FaceReIDEngine:
                     self._process_single_face(frame, annotated_frame, x, y, w, h, embedding, face_crop, detection_records)
                 
                 known_count = len(self.db.identities)
-                cv2.putText(annotated_frame, f"ROS ReID (InsightFace) | Profiles: {known_count} | Detections: {len(detection_records)}", 
+                cv2.putText(annotated_frame, f"Target Warning System | Profiles: {known_count} | Detections: {len(detection_records)}", 
                             (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
                 return annotated_frame, detection_records
             except Exception as e:
                 print(f"[Engine Warn] InsightFace execution error: {e}. Reverting to OpenCV pipeline.")
 
-        # --- OpenCV Fallback Pipeline ---
+        # OpenCV Fallback Pipeline
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         gray = cv2.equalizeHist(gray)
         face_boxes = self.face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(50, 50))
@@ -134,7 +154,7 @@ class FaceReIDEngine:
                 self._process_single_face(frame, annotated_frame, x, y, w, h, embedding, face_crop, detection_records)
 
         known_count = len(self.db.identities)
-        cv2.putText(annotated_frame, f"ROS ReID Active | Profiles: {known_count} | Detections: {len(detection_records)}", 
+        cv2.putText(annotated_frame, f"Target Warning System | Profiles: {known_count} | Detections: {len(detection_records)}", 
                     (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
         
         return annotated_frame, detection_records
@@ -143,18 +163,32 @@ class FaceReIDEngine:
         matched_id, matched_name, distance, confidence_pct = self.db.find_match(embedding)
         
         is_new = False
+        phone_alert_sent = False
+        
         if matched_id is not None:
             person_id = matched_id
             person_name = matched_name
             self.db.update_sighting(person_id, embedding, crop_img=face_crop)
-            box_color = (0, 230, 115)  # Green for known match
-            label_prefix = f"RECOGNIZED ({confidence_pct:.0f}%)"
+            sightings = self.db.identities[person_id].get('sightings', 1)
+            
+            box_color = (0, 230, 115)  # Green for recognized target
+            label_prefix = f"IDENTIFIED ({confidence_pct:.0f}%)"
+            
+            # Trigger Phone Alert if target visit count > ALERT_VISIT_COUNT
+            if config.ENABLE_PHONE_ALERTS and sightings >= config.ALERT_VISIT_COUNT:
+                last_alert_sighting = self.alerted_visits.get(person_id, 0)
+                if sightings > last_alert_sighting:
+                    self.alerted_visits[person_id] = sightings
+                    phone_alert_sent = True
+                    send_phone_alert(person_id, sightings)
+                    box_color = (0, 0, 255)  # Red warning box for alerted target
+                    label_prefix = f"⚠️ PHONE ALERT SENT ({sightings} visits)"
         else:
             person_id, person_name = self.db.register_new_person(embedding, crop_img=face_crop)
             is_new = True
             confidence_pct = 100.0
-            box_color = (255, 120, 0)  # Blue/Cyan for new registration
-            label_prefix = "NEW PERSON REGISTERED"
+            box_color = (255, 120, 0)  # Cyan for new target registration
+            label_prefix = "NEW TARGET ENROLLED"
 
         detection_records.append({
             "person_id": person_id,
@@ -162,7 +196,8 @@ class FaceReIDEngine:
             "bbox": [x, y, w, h],
             "confidence": float(confidence_pct),
             "distance": float(distance),
-            "is_new": is_new
+            "is_new": is_new,
+            "phone_alert_sent": phone_alert_sent
         })
 
         # Draw HUD Box & Text
@@ -174,8 +209,8 @@ class FaceReIDEngine:
         (text_w, text_h), _ = cv2.getTextSize(label_text, font, 0.55, 2)
         banner_y1 = max(0, y - 40)
         banner_y2 = y
-        cv2.rectangle(annotated_frame, (x, banner_y1), (x + max(text_w + 10, 200), banner_y2), (20, 20, 20), -1)
-        cv2.rectangle(annotated_frame, (x, banner_y1), (x + max(text_w + 10, 200), banner_y2), box_color, 1)
+        cv2.rectangle(annotated_frame, (x, banner_y1), (x + max(text_w + 10, 220), banner_y2), (20, 20, 20), -1)
+        cv2.rectangle(annotated_frame, (x, banner_y1), (x + max(text_w + 10, 220), banner_y2), box_color, 1)
         
         cv2.putText(annotated_frame, label_text, (x + 5, max(18, y - 22)), font, 0.55, (255, 255, 255), 2)
         cv2.putText(annotated_frame, sub_text, (x + 5, max(34, y - 6)), font, 0.4, box_color, 1)
